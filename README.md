@@ -1,4 +1,5 @@
-###IMPLEMENTACAO PHP LINT NO GITLAB
+IMPLEMENTACAO PHP LINT NO GITLAB
+================================
 1) Instalação do php no servidor do gitlab
 2) Criação da pasta "custom_hooks" em /var/opt/gitlab/git-data/repositories/GRUPO/REPOSITORIO.git
 3) Criação do arquivo "pre-receive" com o código a ser executado no recebimento dos dados via push dentro da pasta "custom_hooks" acima criada
