@@ -1,29 +1,46 @@
-#!/bin/sh
+#!/bin/bash
 
-PROJECT=`php -r "echo dirname(dirname(dirname(realpath('$0'))));"`
-STAGED_FILES_CMD=`git diff --cached --name-only --diff-filter=ACMR HEAD | grep \\\\.php`
+ERRORS_FOUND=0
 
-# Determine if a file list is passed
-if [ "$#" -eq 1 ]
-then
-	oIFS=$IFS
-	IFS='
-	'
-	SFILES="$1"
-	IFS=$oIFS
-fi
-SFILES=${SFILES:-$STAGED_FILES_CMD}
-
-echo "Checking PHP Lint..."
-for FILE in $SFILES
+while read COMMIT_START COMMIT_END REFNAME
 do
-	php -l -d display_errors=0 $PROJECT/$FILE
-	if [ $? != 0 ]
-	then
-		echo "Fix the error before commit."
-		exit 1
-	fi
-	FILES="$FILES $PROJECT/$FILE"
+  echo "Start: $COMMIT_START"
+  echo "End:   $COMMIT_END"
+  echo "Ref.:  $REFNAME"
+
+  # alteracoes
+  FILES_CHANGED=$(git diff-tree --no-commit-id --name-only -r $COMMIT_START $COMMIT_END 2> /dev/null)
+
+  if [ $? -gt 0 ]
+  then
+    # novo branch
+    FILES_CHANGED=$(git diff-tree --no-commit-id --name-only -r $COMMIT_END 2> /dev/null)
+
+    if [ $? -gt 0 ]
+    then
+      # provavelmente removendo branch
+      continue
+    fi
+  fi
+
+  for FILE in $FILES_CHANGED
+  do
+    if [ ${FILE: -4} == ".php" ]
+    then
+      echo -n "Checagem de sintaxe do arquivo: $FILE... "
+      git show $COMMIT_END:$FILE | php -l
+
+      if [ $? -gt 0 ]
+      then
+        ERRORS_FOUND=$((ERRORS_FOUND + 1))
+      fi
+    fi
+  done
 done
 
-exit $?
+if [ $ERRORS_FOUND -gt 0 ]
+then
+  echo "Erros de sintaxe PHP encontrados, push cancelado. Verifique o log para identificacao do problema"
+
+  exit 1
+fi
