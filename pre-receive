@@ -1,6 +1,8 @@
 #!/bin/bash
 
-ERRORS_FOUND=0
+RED="\e[41m"
+GREEN="\e[42m"
+ENDCOLOR="\e[0m"
 
 while read COMMIT_START COMMIT_END REFNAME
 do
@@ -23,24 +25,31 @@ do
     fi
   fi
 
-  for FILE in $FILES_CHANGED
-  do
-    if [ ${FILE: -4} == ".php" ]
-    then
-      echo -n "Checagem de sintaxe do arquivo: $FILE... "
-      git show $COMMIT_END:$FILE | php -l
+  len="$(echo "$FILES_CHANGED" | wc -l)"
 
-      if [ $? -gt 0 ]
+  echo "${len} arquivo(s) modificado(s). Verificando sintaxe de arquivos PHP. Aguarde, este processo pode demorar..."
+
+  for FILE in $FILES_CHANGED
+  do    
+    if [ ${FILE: -4} == ".php" ]
+    then           
+      echo -ne "\rChecando arquivo: ${FILE}"
+         
+      git cat-file -e $COMMIT_END:$FILE 2> /dev/null
+      
+      if [ $? -eq 0 ]
       then
-        ERRORS_FOUND=$((ERRORS_FOUND + 1))
-      fi
+      	git show $COMMIT_END:$FILE | php -l &> /dev/null
+
+      	if [ $? -gt 0 ]
+      	then
+          echo -e "\n${RED}Erros de sintaxe PHP encontrados, push cancelado. Verifique a sintaxe PHP do seguinte arquivo: ${FILE}${ENDCOLOR}"
+          exit 1
+        fi
+      fi     
     fi
   done
-done
 
-if [ $ERRORS_FOUND -gt 0 ]
-then
-  echo "Erros de sintaxe PHP encontrados, push cancelado. Verifique o log para identificacao do problema"
-
-  exit 1
-fi
+  echo -ne "\rChecagem de arquivos PHP concluída"
+  
+  echo -e "\n${GREEN}Verificação de sintaxe bem sucedida. Sem erros, continuando push...${ENDCOLOR}"
