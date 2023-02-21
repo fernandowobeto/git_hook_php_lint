@@ -1,8 +1,22 @@
 #!/bin/bash
 
+format_size_to_human()
+{
+  if [ $1 -lt 1000 ]
+  then
+    echo "$1b"
+    exit 0
+  fi
+
+  echo "$1" | numfmt --to=si
+}
+
 RED="\e[41m"
 GREEN="\e[42m"
+ORANGE="\e[33m"
 ENDCOLOR="\e[0m"
+
+TOTAL_SIZE=0
 
 while read COMMIT_START COMMIT_END REFNAME
 do
@@ -30,26 +44,37 @@ do
   echo "${len} arquivo(s) modificado(s). Verificando sintaxe de arquivos PHP. Aguarde, este processo pode demorar..."
 
   for FILE in $FILES_CHANGED
-  do    
-    if [ ${FILE: -4} == ".php" ]
-    then           
-      echo -ne "\rChecando arquivo: ${FILE}"
-         
-      git cat-file -e $COMMIT_END:$FILE 2> /dev/null
+  do
+    git cat-file -e $COMMIT_END:$FILE 2> /dev/null
       
-      if [ $? -eq 0 ]
-      then
+    if [ $? -eq 0 ]
+    then
+      FILE_SIZE=$(git cat-file -s "$COMMIT_END:$FILE")
+      TOTAL_SIZE=$(($TOTAL_SIZE+$FILE_SIZE))
+
+      if [ ${FILE: -4} == ".php" ]
+      then           
+        echo -ne "\rChecando arquivo: ${FILE}"
+        
       	git show $COMMIT_END:$FILE | php -l &> /dev/null
 
       	if [ $? -gt 0 ]
       	then
           echo -e "\n${RED}Erros de sintaxe PHP encontrados, push cancelado. Verifique a sintaxe PHP do seguinte arquivo: ${FILE}${ENDCOLOR}"
           exit 1
-        fi
-      fi     
+        fi    
+      fi
     fi
   done
 
   echo -ne "\rChecagem de arquivos PHP concluída"
   
   echo -e "\n${GREEN}Verificação de sintaxe bem sucedida. Sem erros, continuando push...${ENDCOLOR}"
+
+  if [ $TOTAL_SIZE -gt 0 ]
+  then
+    formated_size=$( format_size_to_human $TOTAL_SIZE )
+
+    echo -e "${ORANGE}Um total de $formated_size em arquivos foram enviados${ENDCOLOR}"
+  fi
+done
